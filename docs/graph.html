@@ -314,7 +314,7 @@ class graph:
             sys.exit(&#39;Invalid reweighting method &#39; + method + &#39;.&#39;)
 
 
-    def laplacian(self, normalization=&#34;combinatorial&#34;):
+    def laplacian(self, normalization=&#34;combinatorial&#34;, alpha=1):
         &#34;&#34;&#34;Graph Laplacian
         ======
 
@@ -326,11 +326,14 @@ class graph:
         \\[L_{\\rm normalized} = I - D^{-1/2}WD^{-1/2},\\]
         where \\(D\\) is the diagonal degree matrix, which is defined as
         \\[D_{ii} = \\sum_{j=1}^n w_{ij}.\\]
+        The Coifman-Lafon Laplacian is also supported. 
 
         Parameters
         ----------
-        normalization : {&#39;combinatorial&#39;,&#39;randomwalk&#39;,&#39;normalized&#39;}, default=&#39;combinatorial&#39;
+        normalization : {&#39;combinatorial&#39;,&#39;randomwalk&#39;,&#39;normalized&#39;,&#39;coifmanlafon&#39;}, default=&#39;combinatorial&#39;
             Type of normalization to apply.
+        alpha : float (optional)
+            Parameter for Coifman-Lafon Laplacian
 
         Returns
         -------
@@ -349,6 +352,9 @@ class graph:
         elif normalization == &#34;normalized&#34;:
             Dinv2 = self.degree_matrix(p=-0.5)
             L = I - Dinv2*self.weight_matrix*Dinv2
+        elif normalization == &#34;coifmanlafon&#34;:
+            D = self.degree_matrix(p=-alpha)
+            L = graph(D*self.weight_matrix*D).laplacian(normalization=&#39;randomwalk&#39;)
         else:
             sys.exit(&#34;Invalid option for graph Laplacian normalization.&#34;)
 
@@ -443,7 +449,7 @@ class graph:
             implemented for gamma &gt; 0.
         k : int (optional), default=10
             Number of eigenvectors to compute.
-        c : int (optional), default=2*number
+        c : int (optional), default=2*k
             Cutoff for randomized SVD.
         gamma : float (optional), default=0
             Parameter for modularity (add more details)
@@ -636,8 +642,8 @@ class graph:
 
         return fiedler_vector
 
-    def peikonal(self, bdy_set, bdy_val=0, f=1, p=1, u0=None, max_num_it=1e5, 
-                                tol=1e-3, num_bisection_it=30, prog=False):
+    def peikonal(self, bdy_set, bdy_val=0, f=1, p=1, u0=None, solver=&#39;fmm&#39;, max_num_it=1e5, 
+                                                     tol=1e-3, num_bisection_it=30, prog=False,):
         &#34;&#34;&#34;p-eikonal equation 
         =====================
 
@@ -657,14 +663,16 @@ class graph:
             is interpreted as a constant vector of the graph.
         p : float (optional), default=1
             Value of exponent p in the p-eikonal equation.
+        solver : {&#39;fmm&#39;, &#39;gauss-seidel&#39;}, default=&#39;fmm&#39;
+            Solver for p-eikonal equation.
         u0 : numpy array (float, optional), default=None
             Initialization of solver. If not provided, then u0=0.
         max_num_it : int (optional), default=1e5
-            Maximum number of iterations.
+            Maximum number of iterations for &#39;gauss-seidel&#39; solver.
         tol : float (optional), default=1e-3
-            Tolerance with which to solve the equation.
+            Tolerance with which to solve the equation for &#39;gauss-seidel&#39; solver.
         num_bisection_it : int (optional), default=30
-            Number of bisection iterations for solver.
+            Number of bisection iterations for solver for &#39;gauss-seidel&#39; solver with \\(p&gt;1\\).
         prog : bool (optional), default=False
             Toggles whether to print progress information.
 
@@ -721,7 +729,10 @@ class graph:
         f = np.ascontiguousarray(f,dtype=np.float64)
         bdy_val = np.ascontiguousarray(bdy_val,dtype=np.float64)
 
-        cextensions.peikonal(u,self.I,self.K,self.V,bdy_set,f,bdy_val,p,max_num_it,tol,num_bisection_it,prog)
+        if solver == &#39;fmm&#39;:
+            cextensions.peikonal_fmm(u,self.I,self.K,self.V,bdy_set,f,bdy_val,p,num_bisection_it)
+        else:
+            cextensions.peikonal(u,self.I,self.K,self.V,bdy_set,f,bdy_val,p,max_num_it,tol,num_bisection_it,prog)
 
         return u
 
@@ -1323,7 +1334,7 @@ eigendecompositions, which are useful in graph learning.</p>
             sys.exit(&#39;Invalid reweighting method &#39; + method + &#39;.&#39;)
 
 
-    def laplacian(self, normalization=&#34;combinatorial&#34;):
+    def laplacian(self, normalization=&#34;combinatorial&#34;, alpha=1):
         &#34;&#34;&#34;Graph Laplacian
         ======
 
@@ -1335,11 +1346,14 @@ eigendecompositions, which are useful in graph learning.</p>
         \\[L_{\\rm normalized} = I - D^{-1/2}WD^{-1/2},\\]
         where \\(D\\) is the diagonal degree matrix, which is defined as
         \\[D_{ii} = \\sum_{j=1}^n w_{ij}.\\]
+        The Coifman-Lafon Laplacian is also supported. 
 
         Parameters
         ----------
-        normalization : {&#39;combinatorial&#39;,&#39;randomwalk&#39;,&#39;normalized&#39;}, default=&#39;combinatorial&#39;
+        normalization : {&#39;combinatorial&#39;,&#39;randomwalk&#39;,&#39;normalized&#39;,&#39;coifmanlafon&#39;}, default=&#39;combinatorial&#39;
             Type of normalization to apply.
+        alpha : float (optional)
+            Parameter for Coifman-Lafon Laplacian
 
         Returns
         -------
@@ -1358,6 +1372,9 @@ eigendecompositions, which are useful in graph learning.</p>
         elif normalization == &#34;normalized&#34;:
             Dinv2 = self.degree_matrix(p=-0.5)
             L = I - Dinv2*self.weight_matrix*Dinv2
+        elif normalization == &#34;coifmanlafon&#34;:
+            D = self.degree_matrix(p=-alpha)
+            L = graph(D*self.weight_matrix*D).laplacian(normalization=&#39;randomwalk&#39;)
         else:
             sys.exit(&#34;Invalid option for graph Laplacian normalization.&#34;)
 
@@ -1452,7 +1469,7 @@ eigendecompositions, which are useful in graph learning.</p>
             implemented for gamma &gt; 0.
         k : int (optional), default=10
             Number of eigenvectors to compute.
-        c : int (optional), default=2*number
+        c : int (optional), default=2*k
             Cutoff for randomized SVD.
         gamma : float (optional), default=0
             Parameter for modularity (add more details)
@@ -1645,8 +1662,8 @@ eigendecompositions, which are useful in graph learning.</p>
 
         return fiedler_vector
 
-    def peikonal(self, bdy_set, bdy_val=0, f=1, p=1, u0=None, max_num_it=1e5, 
-                                tol=1e-3, num_bisection_it=30, prog=False):
+    def peikonal(self, bdy_set, bdy_val=0, f=1, p=1, u0=None, solver=&#39;fmm&#39;, max_num_it=1e5, 
+                                                     tol=1e-3, num_bisection_it=30, prog=False,):
         &#34;&#34;&#34;p-eikonal equation 
         =====================
 
@@ -1666,14 +1683,16 @@ eigendecompositions, which are useful in graph learning.</p>
             is interpreted as a constant vector of the graph.
         p : float (optional), default=1
             Value of exponent p in the p-eikonal equation.
+        solver : {&#39;fmm&#39;, &#39;gauss-seidel&#39;}, default=&#39;fmm&#39;
+            Solver for p-eikonal equation.
         u0 : numpy array (float, optional), default=None
             Initialization of solver. If not provided, then u0=0.
         max_num_it : int (optional), default=1e5
-            Maximum number of iterations.
+            Maximum number of iterations for &#39;gauss-seidel&#39; solver.
         tol : float (optional), default=1e-3
-            Tolerance with which to solve the equation.
+            Tolerance with which to solve the equation for &#39;gauss-seidel&#39; solver.
         num_bisection_it : int (optional), default=30
-            Number of bisection iterations for solver.
+            Number of bisection iterations for solver for &#39;gauss-seidel&#39; solver with \\(p&gt;1\\).
         prog : bool (optional), default=False
             Toggles whether to print progress information.
 
@@ -1730,7 +1749,10 @@ eigendecompositions, which are useful in graph learning.</p>
         f = np.ascontiguousarray(f,dtype=np.float64)
         bdy_val = np.ascontiguousarray(bdy_val,dtype=np.float64)
 
-        cextensions.peikonal(u,self.I,self.K,self.V,bdy_set,f,bdy_val,p,max_num_it,tol,num_bisection_it,prog)
+        if solver == &#39;fmm&#39;:
+            cextensions.peikonal_fmm(u,self.I,self.K,self.V,bdy_set,f,bdy_val,p,num_bisection_it)
+        else:
+            cextensions.peikonal(u,self.I,self.K,self.V,bdy_set,f,bdy_val,p,max_num_it,tol,num_bisection_it,prog)
 
         return u
 
@@ -2487,7 +2509,7 @@ randomized SVD. </p>
 implemented for gamma &gt; 0.</dd>
 <dt><strong><code>k</code></strong> :&ensp;<code>int (optional)</code>, default=<code>10</code></dt>
 <dd>Number of eigenvectors to compute.</dd>
-<dt><strong><code>c</code></strong> :&ensp;<code>int (optional)</code>, default=<code>2*number</code></dt>
+<dt><strong><code>c</code></strong> :&ensp;<code>int (optional)</code>, default=<code>2*k</code></dt>
 <dd>Cutoff for randomized SVD.</dd>
 <dt><strong><code>gamma</code></strong> :&ensp;<code>float (optional)</code>, default=<code>0</code></dt>
 <dd>Parameter for modularity (add more details)</dd>
@@ -2562,7 +2584,7 @@ plt.show()
         implemented for gamma &gt; 0.
     k : int (optional), default=10
         Number of eigenvectors to compute.
-    c : int (optional), default=2*number
+    c : int (optional), default=2*k
         Cutoff for randomized SVD.
     gamma : float (optional), default=0
         Parameter for modularity (add more details)
@@ -2916,7 +2938,7 @@ matrix as follows
 </details>
 </dd>
 <dt id="graphlearning.graph.graph.laplacian"><code class="name flex">
-<span>def <span class="ident">laplacian</span></span>(<span>self, normalization='combinatorial')</span>
+<span>def <span class="ident">laplacian</span></span>(<span>self, normalization='combinatorial', alpha=1)</span>
 </code></dt>
 <dd>
 <div class="desc"><h1 id="graph-laplacian">Graph Laplacian</h1>
@@ -2927,11 +2949,14 @@ given weight matrix <span><span class="MathJax_Preview">W</span><script type="ma
 and
 <span><span class="MathJax_Preview">L_{\rm normalized} = I - D^{-1/2}WD^{-1/2},</span><script type="math/tex; mode=display">L_{\rm normalized} = I - D^{-1/2}WD^{-1/2},</script></span>
 where <span><span class="MathJax_Preview">D</span><script type="math/tex">D</script></span> is the diagonal degree matrix, which is defined as
-<span><span class="MathJax_Preview">D_{ii} = \sum_{j=1}^n w_{ij}.</span><script type="math/tex; mode=display">D_{ii} = \sum_{j=1}^n w_{ij}.</script></span></p>
+<span><span class="MathJax_Preview">D_{ii} = \sum_{j=1}^n w_{ij}.</span><script type="math/tex; mode=display">D_{ii} = \sum_{j=1}^n w_{ij}.</script></span>
+The Coifman-Lafon Laplacian is also supported. </p>
 <h2 id="parameters">Parameters</h2>
 <dl>
-<dt><strong><code>normalization</code></strong> :&ensp;<code>{'combinatorial','randomwalk','normalized'}</code>, default=<code>'combinatorial'</code></dt>
+<dt><strong><code>normalization</code></strong> :&ensp;<code>{'combinatorial','randomwalk','normalized','coifmanlafon'}</code>, default=<code>'combinatorial'</code></dt>
 <dd>Type of normalization to apply.</dd>
+<dt><strong><code>alpha</code></strong> :&ensp;<code>float (optional)</code></dt>
+<dd>Parameter for Coifman-Lafon Laplacian</dd>
 </dl>
 <h2 id="returns">Returns</h2>
 <dl>
@@ -2942,7 +2967,7 @@ where <span><span class="MathJax_Preview">D</span><script type="math/tex">D</scr
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def laplacian(self, normalization=&#34;combinatorial&#34;):
+<pre><code class="python">def laplacian(self, normalization=&#34;combinatorial&#34;, alpha=1):
     &#34;&#34;&#34;Graph Laplacian
     ======
 
@@ -2954,11 +2979,14 @@ where <span><span class="MathJax_Preview">D</span><script type="math/tex">D</scr
     \\[L_{\\rm normalized} = I - D^{-1/2}WD^{-1/2},\\]
     where \\(D\\) is the diagonal degree matrix, which is defined as
     \\[D_{ii} = \\sum_{j=1}^n w_{ij}.\\]
+    The Coifman-Lafon Laplacian is also supported. 
 
     Parameters
     ----------
-    normalization : {&#39;combinatorial&#39;,&#39;randomwalk&#39;,&#39;normalized&#39;}, default=&#39;combinatorial&#39;
+    normalization : {&#39;combinatorial&#39;,&#39;randomwalk&#39;,&#39;normalized&#39;,&#39;coifmanlafon&#39;}, default=&#39;combinatorial&#39;
         Type of normalization to apply.
+    alpha : float (optional)
+        Parameter for Coifman-Lafon Laplacian
 
     Returns
     -------
@@ -2977,6 +3005,9 @@ where <span><span class="MathJax_Preview">D</span><script type="math/tex">D</scr
     elif normalization == &#34;normalized&#34;:
         Dinv2 = self.degree_matrix(p=-0.5)
         L = I - Dinv2*self.weight_matrix*Dinv2
+    elif normalization == &#34;coifmanlafon&#34;:
+        D = self.degree_matrix(p=-alpha)
+        L = graph(D*self.weight_matrix*D).laplacian(normalization=&#39;randomwalk&#39;)
     else:
         sys.exit(&#34;Invalid option for graph Laplacian normalization.&#34;)
 
@@ -3143,7 +3174,7 @@ teleportation paramter. Solution is computed with the power iteration
 </details>
 </dd>
 <dt id="graphlearning.graph.graph.peikonal"><code class="name flex">
-<span>def <span class="ident">peikonal</span></span>(<span>self, bdy_set, bdy_val=0, f=1, p=1, u0=None, max_num_it=100000.0, tol=0.001, num_bisection_it=30, prog=False)</span>
+<span>def <span class="ident">peikonal</span></span>(<span>self, bdy_set, bdy_val=0, f=1, p=1, u0=None, solver='fmm', max_num_it=100000.0, tol=0.001, num_bisection_it=30, prog=False)</span>
 </code></dt>
 <dd>
 <div class="desc"><h1 id="p-eikonal-equation">p-eikonal equation</h1>
@@ -3162,14 +3193,16 @@ interpreted as a constant over <span><span class="MathJax_Preview">\Gamma</span>
 is interpreted as a constant vector of the graph.</dd>
 <dt><strong><code>p</code></strong> :&ensp;<code>float (optional)</code>, default=<code>1</code></dt>
 <dd>Value of exponent p in the p-eikonal equation.</dd>
+<dt><strong><code>solver</code></strong> :&ensp;<code>{'fmm', 'gauss-seidel'}</code>, default=<code>'fmm'</code></dt>
+<dd>Solver for p-eikonal equation.</dd>
 <dt><strong><code>u0</code></strong> :&ensp;<code>numpy array (float</code>, optional<code>)</code>, default=<code>None</code></dt>
 <dd>Initialization of solver. If not provided, then u0=0.</dd>
 <dt><strong><code>max_num_it</code></strong> :&ensp;<code>int (optional)</code>, default=<code>1e5</code></dt>
-<dd>Maximum number of iterations.</dd>
+<dd>Maximum number of iterations for 'gauss-seidel' solver.</dd>
 <dt><strong><code>tol</code></strong> :&ensp;<code>float (optional)</code>, default=<code>1e-3</code></dt>
-<dd>Tolerance with which to solve the equation.</dd>
+<dd>Tolerance with which to solve the equation for 'gauss-seidel' solver.</dd>
 <dt><strong><code>num_bisection_it</code></strong> :&ensp;<code>int (optional)</code>, default=<code>30</code></dt>
-<dd>Number of bisection iterations for solver.</dd>
+<dd>Number of bisection iterations for solver for 'gauss-seidel' solver with <span><span class="MathJax_Preview">p&gt;1</span><script type="math/tex">p>1</script></span>.</dd>
 <dt><strong><code>prog</code></strong> :&ensp;<code>bool (optional)</code>, default=<code>False</code></dt>
 <dd>Toggles whether to print progress information.</dd>
 </dl>
@@ -3202,8 +3235,8 @@ plt.show()
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def peikonal(self, bdy_set, bdy_val=0, f=1, p=1, u0=None, max_num_it=1e5, 
-                            tol=1e-3, num_bisection_it=30, prog=False):
+<pre><code class="python">def peikonal(self, bdy_set, bdy_val=0, f=1, p=1, u0=None, solver=&#39;fmm&#39;, max_num_it=1e5, 
+                                                 tol=1e-3, num_bisection_it=30, prog=False,):
     &#34;&#34;&#34;p-eikonal equation 
     =====================
 
@@ -3223,14 +3256,16 @@ plt.show()
         is interpreted as a constant vector of the graph.
     p : float (optional), default=1
         Value of exponent p in the p-eikonal equation.
+    solver : {&#39;fmm&#39;, &#39;gauss-seidel&#39;}, default=&#39;fmm&#39;
+        Solver for p-eikonal equation.
     u0 : numpy array (float, optional), default=None
         Initialization of solver. If not provided, then u0=0.
     max_num_it : int (optional), default=1e5
-        Maximum number of iterations.
+        Maximum number of iterations for &#39;gauss-seidel&#39; solver.
     tol : float (optional), default=1e-3
-        Tolerance with which to solve the equation.
+        Tolerance with which to solve the equation for &#39;gauss-seidel&#39; solver.
     num_bisection_it : int (optional), default=30
-        Number of bisection iterations for solver.
+        Number of bisection iterations for solver for &#39;gauss-seidel&#39; solver with \\(p&gt;1\\).
     prog : bool (optional), default=False
         Toggles whether to print progress information.
 
@@ -3287,7 +3322,10 @@ plt.show()
     f = np.ascontiguousarray(f,dtype=np.float64)
     bdy_val = np.ascontiguousarray(bdy_val,dtype=np.float64)
 
-    cextensions.peikonal(u,self.I,self.K,self.V,bdy_set,f,bdy_val,p,max_num_it,tol,num_bisection_it,prog)
+    if solver == &#39;fmm&#39;:
+        cextensions.peikonal_fmm(u,self.I,self.K,self.V,bdy_set,f,bdy_val,p,num_bisection_it)
+    else:
+        cextensions.peikonal(u,self.I,self.K,self.V,bdy_set,f,bdy_val,p,max_num_it,tol,num_bisection_it,prog)
 
     return u</code></pre>
 </details>
