@@ -14,24 +14,32 @@ from scipy.special import softmax
 from abc import ABCMeta, abstractmethod
 import matplotlib.pyplot as plt
 
-#Directories
-results_dir = os.path.join(os.getcwd(),'results')
 
 class active_learning:
-    def __init__(self, W, training_set, current_labeled_set, spectral_truncation_parameter, gamma=0.1):
-        self.graph = W
+    def __init__(self, W, training_set, current_labeled_set, eval_cutoff, gamma=0.1):
+        self.graph = gl.graph(W)
         self.current_labeled_set = current_labeled_set
+        self.initial_labeled_set = current_labeled_set
         self.training_set = training_set
         self.candidate_inds = np.setdiff1d(training_set, current_labeled_set)
-        self.spectral_truncation_parameter = spectral_truncation_parameter
+        self.eval_cutoff = eval_cutoff
         self.gamma = gamma
-        evals, self.evecs = gl.graph(W).eigen_decomp(normalization='normalized', k=spectral_truncation_parameter)
+        evals, self.evecs = gl.graph(W).eigen_decomp(normalization='normalized', k=eval_cutoff)
         self.covariance_matrix = np.linalg.inv(np.diag(evals) + self.evecs[current_labeled_set,:].T @ self.evecs[current_labeled_set,:] / gamma**2.)
-  
-    def select_next_training_points(self, ssl, acquisition, labels, batch_size=1):
-        """Select next training points
+
+    def reset_labeled_set(self):
+        """Reset Labeled Set
         ======
     
+        Resets the current labeled set to the initial labeled set 
+
+        """
+        self.current_labeled_set = self.initial_labeled_set
+
+    def select_query_points(self, ssl, acquisition, oracle=None, batch_size=1, candidate_method='full', fraction_points=0.1):
+        """Select query points
+        ======
+
         Select "batch_size" number of points to be labeled by an active learning algorithm we specify 
 
         Parameters
@@ -40,28 +48,38 @@ class active_learning:
             ssl classifier object. 
         acquisition : class object
             acquisition function object.
-        labels : numpy array, int
-            True labels for all datapoints.
+        oracle : numpy array, int, default=None
+            true oracle for all datapoints.
         batch_size : int (optional), default=1
             number of points want to be labeled in one iteration of active learning.
-
+        candidate_method : str (optional), default='full'
+            'full' for setting candidate indices to full unlabeled set. 
+            'rand' for setting candidate indices to a random fraction of the unlabeled set.
+        fraction_points : int (optional), default=0.1
+            fraction of unlabeled points we want to use as our candidate set.
+            
         """
 
-        for i in range(batch_size):
-            objective_values = acquisition.compute_acquisition_function_values(ssl, self, labels, uncertainty_method='smallest_margin')
-            new_train_ind = self.candidate_inds[np.argmax(objective_values)]
-            self.current_labeled_set = np.append(self.current_labeled_set, new_train_ind)
+        if candidate_method == 'full':
             self.candidate_inds = np.setdiff1d(self.training_set, self.current_labeled_set)
-            for k in [new_train_ind]:
-                vk = self.evecs[k]
-                Cavk = self.covariance_matrix @ vk
-                ip = np.inner(vk, Cavk)
-                self.covariance_matrix -= np.outer(Cavk, Cavk)/(self.gamma**2. + ip)
-
+        elif (candidate_method == 'rand') and (fraction_points>0 and fraction_points<1):
+            unlabeled_inds = np.setdiff1d(self.training_set, self.current_labeled_set)
+            self.candidate_inds = np.random.choice(unlabeled_inds, size=int(fraction_points * len(unlabeled_inds)), replace=False)
+        else:
+            raise ValueError("Wrong input for candidate_method or fraction_points")
+        objective_values = acquisition.compute_acquisition_function_values(ssl, self, oracle, uncertainty_method='smallest_margin')
+        query_inds = self.candidate_inds[(-objective_values).argsort()[:batch_size]]
+        self.current_labeled_set = np.append(self.current_labeled_set, query_inds)
+        for k in query_inds:
+            vk = self.evecs[k]
+            Cavk = self.covariance_matrix @ vk
+            ip = np.inner(vk, Cavk)
+            self.covariance_matrix -= np.outer(Cavk, Cavk)/(self.gamma**2. + ip)
+        return query_inds
 
 class acquisition_function:
     @abstractmethod
-    def compute_acquisition_function_values(self, ssl, active_learning, labels, uncertainty_method):
+    def compute_acquisition_function_values(self, ssl, active_learning, oracle, uncertainty_method):
         """Internal Compute Acquisition Function Values Function
         ======
 
@@ -73,7 +91,7 @@ class acquisition_function:
             ssl classifier object. 
         active_learning : class object
             active learning object.
-        labels : numpy array, int
+        oracle : numpy array, int
             True labels for all datapoints.
         uncertainty_method : str
             if method requires "uncertainty calculation" this string specifies which type of uncertainty measure to apply
@@ -101,7 +119,7 @@ class uncertainty_sampling(acquisition_function):
 
     X,labels = datasets.make_moons(n_samples=500,noise=0.1)
     W = gl.weightmatrix.knn(X,10)
-    train_ind = gl.trainsets.generate(labels, rate=5)
+    train_ind = gl.trainsets.generate(oracle, rate=5)
 
     plt.scatter(X[:,0],X[:,1], c=labels)
     plt.scatter(X[train_ind,0],X[train_ind,1], c='r')
@@ -109,21 +127,21 @@ class uncertainty_sampling(acquisition_function):
 
     model = gl.ssl.laplace(W)
     acq = uncertainty_sampling()
-    al = active_learning(W, np.arange(len(labels)), train_ind, 300)
-    al.select_next_training_points(model, acq, labels, batch_size=5)
-    new_ind = np.setdiff1d(al.current_labeled_set, train_ind)
+    al = active_learning(W, np.arange(labels.size), train_ind, 200)
 
-    plt.scatter(X[:,0],X[:,1], c=labels)
-    plt.scatter(X[train_ind,0],X[train_ind,1], c='r')
-    plt.scatter(X[new_ind,0],X[new_ind,1], c='r', marker='*', s=200, edgecolors='k', linewidths=1.5)
-    plt.show()
+    for i in range(10):
+        query_points = al.select_query_points(model, acq, oracle=labels)
+        plt.scatter(X[:,0],X[:,1], c=labels)
+        plt.scatter(X[al.current_labeled_set,0],X[al.current_labeled_set,1], c='r')
+        plt.scatter(X[query_points,0],X[query_points,1], c='r', marker='*', s=200, edgecolors='k', linewidths=1.5)
+        plt.show()
     ```
 
     Reference
     ---------
     """
-    def compute_acquisition_function_values(self, ssl, active_learning, labels, uncertainty_method='smallest_margin'):
-        u = ssl.fit(active_learning.current_labeled_set, labels[active_learning.current_labeled_set])
+    def compute_acquisition_function_values(self, ssl, active_learning, oracle, uncertainty_method='smallest_margin'):
+        u = ssl.fit(active_learning.current_labeled_set, oracle[active_learning.current_labeled_set])
         if uncertainty_method == "norm":
             u_probs = softmax(u[active_learning.candidate_inds], axis=1)
             one_hot_predicted_labels = np.eye(u.shape[1])[np.argmax(u[active_learning.candidate_inds], axis=1)]
@@ -157,7 +175,7 @@ class v_opt(acquisition_function):
 
     X,labels = datasets.make_moons(n_samples=500,noise=0.1)
     W = gl.weightmatrix.knn(X,10)
-    train_ind = gl.trainsets.generate(labels, rate=5)
+    train_ind = gl.trainsets.generate(oracle, rate=5)
 
     plt.scatter(X[:,0],X[:,1], c=labels)
     plt.scatter(X[train_ind,0],X[train_ind,1], c='r')
@@ -165,20 +183,20 @@ class v_opt(acquisition_function):
 
     model = gl.ssl.laplace(W)
     acq = v_opt()
-    al = active_learning(W, np.arange(len(labels)), train_ind, 300)
-    al.select_next_training_points(model, acq, labels, batch_size=5)
-    new_ind = np.setdiff1d(al.current_labeled_set, train_ind)
+    al = active_learning(W, np.arange(labels.size), train_ind, 200)
 
-    plt.scatter(X[:,0],X[:,1], c=labels)
-    plt.scatter(X[train_ind,0],X[train_ind,1], c='r')
-    plt.scatter(X[new_ind,0],X[new_ind,1], c='r', marker='*', s=200, edgecolors='k', linewidths=1.5)
-    plt.show()
+    for i in range(10):
+        query_points = al.select_query_points(model, acq, oracle=labels)
+        plt.scatter(X[:,0],X[:,1], c=labels)
+        plt.scatter(X[al.current_labeled_set,0],X[al.current_labeled_set,1], c='r')
+        plt.scatter(X[query_points,0],X[query_points,1], c='r', marker='*', s=200, edgecolors='k', linewidths=1.5)
+        plt.show()
     ```
 
     Reference
     ---------
     """
-    def compute_acquisition_function_values(self, ssl, active_learning, labels, uncertainty_method='smallest_margin'):
+    def compute_acquisition_function_values(self, ssl, active_learning, oracle, uncertainty_method='smallest_margin'):
         Cavk = active_learning.covariance_matrix @ active_learning.evecs[active_learning.candidate_inds,:].T
         col_norms = np.linalg.norm(Cavk, axis=0)
         diag_terms = (active_learning.gamma**2. + np.array([np.inner(active_learning.evecs[k,:], Cavk[:, i]) for i,k in enumerate(active_learning.candidate_inds)]))
@@ -200,7 +218,7 @@ class sigma_opt(acquisition_function):
 
     X,labels = datasets.make_moons(n_samples=500,noise=0.1)
     W = gl.weightmatrix.knn(X,10)
-    train_ind = gl.trainsets.generate(labels, rate=5)
+    train_ind = gl.trainsets.generate(oracle, rate=5)
 
     plt.scatter(X[:,0],X[:,1], c=labels)
     plt.scatter(X[train_ind,0],X[train_ind,1], c='r')
@@ -208,20 +226,20 @@ class sigma_opt(acquisition_function):
 
     model = gl.ssl.laplace(W)
     acq = sigma_opt()
-    al = active_learning(W, np.arange(len(labels)), train_ind, 300)
-    al.select_next_training_points(model, acq, labels, batch_size=5)
-    new_ind = np.setdiff1d(al.current_labeled_set, train_ind)
+    al = active_learning(W, np.arange(labels.size), train_ind, 200)
 
-    plt.scatter(X[:,0],X[:,1], c=labels)
-    plt.scatter(X[train_ind,0],X[train_ind,1], c='r')
-    plt.scatter(X[new_ind,0],X[new_ind,1], c='r', marker='*', s=200, edgecolors='k', linewidths=1.5)
-    plt.show()
+    for i in range(10):
+        query_points = al.select_query_points(model, acq, oracle=labels)
+        plt.scatter(X[:,0],X[:,1], c=labels)
+        plt.scatter(X[al.current_labeled_set,0],X[al.current_labeled_set,1], c='r')
+        plt.scatter(X[query_points,0],X[query_points,1], c='r', marker='*', s=200, edgecolors='k', linewidths=1.5)
+        plt.show()
     ```
 
     Reference
     ---------
     """
-    def compute_acquisition_function_values(self, ssl, active_learning, labels, uncertainty_method='smallest_margin'):
+    def compute_acquisition_function_values(self, ssl, active_learning, oracle, uncertainty_method='smallest_margin'):
         Cavk = active_learning.covariance_matrix @ active_learning.evecs[active_learning.candidate_inds,:].T
         col_sums = np.sum(Cavk, axis=0)
         diag_terms = (active_learning.gamma**2. + np.array([np.inner(active_learning.evecs[k,:], Cavk[:, i]) for i,k in enumerate(active_learning.candidate_inds)]))
@@ -243,7 +261,7 @@ class model_change(acquisition_function):
 
     X,labels = datasets.make_moons(n_samples=500,noise=0.1)
     W = gl.weightmatrix.knn(X,10)
-    train_ind = gl.trainsets.generate(labels, rate=5)
+    train_ind = gl.trainsets.generate(oracle, rate=5)
 
     plt.scatter(X[:,0],X[:,1], c=labels)
     plt.scatter(X[train_ind,0],X[train_ind,1], c='r')
@@ -251,21 +269,21 @@ class model_change(acquisition_function):
 
     model = gl.ssl.laplace(W)
     acq = model_change()
-    al = active_learning(W, np.arange(len(labels)), train_ind, 300)
-    al.select_next_training_points(model, acq, labels, batch_size=5)
-    new_ind = np.setdiff1d(al.current_labeled_set, train_ind)
+    al = active_learning(W, np.arange(labels.size), train_ind, 200)
 
-    plt.scatter(X[:,0],X[:,1], c=labels)
-    plt.scatter(X[train_ind,0],X[train_ind,1], c='r')
-    plt.scatter(X[new_ind,0],X[new_ind,1], c='r', marker='*', s=200, edgecolors='k', linewidths=1.5)
-    plt.show()
+    for i in range(10):
+        query_points = al.select_query_points(model, acq, oracle=labels)
+        plt.scatter(X[:,0],X[:,1], c=labels)
+        plt.scatter(X[al.current_labeled_set,0],X[al.current_labeled_set,1], c='r')
+        plt.scatter(X[query_points,0],X[query_points,1], c='r', marker='*', s=200, edgecolors='k', linewidths=1.5)
+        plt.show()
     ```
 
     Reference
     ---------
     """
-    def compute_acquisition_function_values(self, ssl, active_learning, labels, uncertainty_method='smallest_margin'):
-        unc_terms = uncertainty_sampling().compute_acquisition_function_values(ssl, active_learning, labels)
+    def compute_acquisition_function_values(self, ssl, active_learning, oracle, uncertainty_method='smallest_margin'):
+        unc_terms = uncertainty_sampling().compute_acquisition_function_values(ssl, active_learning, oracle)
         Cavk = active_learning.covariance_matrix @ active_learning.evecs[active_learning.candidate_inds,:].T
         col_norms = np.linalg.norm(Cavk, axis=0)
         diag_terms = (active_learning.gamma**2. + np.array([np.inner(active_learning.evecs[k,:], Cavk[:, i]) for i,k in enumerate(active_learning.candidate_inds)]))
@@ -287,7 +305,7 @@ class model_change_vopt(acquisition_function):
 
     X,labels = datasets.make_moons(n_samples=500,noise=0.1)
     W = gl.weightmatrix.knn(X,10)
-    train_ind = gl.trainsets.generate(labels, rate=5)
+    train_ind = gl.trainsets.generate(oracle, rate=5)
 
     plt.scatter(X[:,0],X[:,1], c=labels)
     plt.scatter(X[train_ind,0],X[train_ind,1], c='r')
@@ -295,21 +313,21 @@ class model_change_vopt(acquisition_function):
 
     model = gl.ssl.laplace(W)
     acq = model_change_vopt()
-    al = active_learning(W, np.arange(len(labels)), train_ind, 300)
-    al.select_next_training_points(model, acq, labels, batch_size=5)
-    new_ind = np.setdiff1d(al.current_labeled_set, train_ind)
+    al = active_learning(W, np.arange(labels.size), train_ind, 200)
 
-    plt.scatter(X[:,0],X[:,1], c=labels)
-    plt.scatter(X[train_ind,0],X[train_ind,1], c='r')
-    plt.scatter(X[new_ind,0],X[new_ind,1], c='r', marker='*', s=200, edgecolors='k', linewidths=1.5)
-    plt.show()
+    for i in range(10):
+        query_points = al.select_query_points(model, acq, oracle=labels)
+        plt.scatter(X[:,0],X[:,1], c=labels)
+        plt.scatter(X[al.current_labeled_set,0],X[al.current_labeled_set,1], c='r')
+        plt.scatter(X[query_points,0],X[query_points,1], c='r', marker='*', s=200, edgecolors='k', linewidths=1.5)
+        plt.show()
     ```
 
     Reference
     ---------
     """
-    def compute_acquisition_function_values(self, ssl, active_learning, labels, uncertainty_method='smallest_margin'):
-        unc_terms = uncertainty_sampling().compute_acquisition_function_values(ssl, active_learning, labels)
+    def compute_acquisition_function_values(self, ssl, active_learning, oracle, uncertainty_method='smallest_margin'):
+        unc_terms = uncertainty_sampling().compute_acquisition_function_values(ssl, active_learning, oracle)
         Cavk = active_learning.covariance_matrix @ active_learning.evecs[active_learning.candidate_inds,:].T
         col_norms = np.linalg.norm(Cavk, axis=0)
         diag_terms = (active_learning.gamma**2. + np.array([np.inner(active_learning.evecs[k,:], Cavk[:, i]) for i,k in enumerate(active_learning.candidate_inds)]))
