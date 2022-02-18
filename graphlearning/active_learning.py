@@ -196,7 +196,7 @@ class v_opt(acquisition_function):
 
     Reference
     ---------
-    [2] Ji, M. and Han, J., “A variance minimization criterion to active learning on graphs,” in [Artificial Intelligence
+    [1] Ji, M. and Han, J., “A variance minimization criterion to active learning on graphs,” in [Artificial Intelligence
     and Statistics ], 556–564 (Mar. 2012).
     """
     def compute_acquisition_function_values(self, ssl, active_learning, oracle, uncertainty_method='smallest_margin'):
@@ -241,7 +241,7 @@ class sigma_opt(acquisition_function):
 
     Reference
     ---------
-    [3] Ma, Y., Garnett, R., and Schneider, J., “Σ-optimality for active learning on Gaussian random fields,”
+    [1] Ma, Y., Garnett, R., and Schneider, J., “Σ-optimality for active learning on Gaussian random fields,”
     in [Advances in Neural Information Processing Systems 26 ], Burges, C. J. C., Bottou, L., Welling, M.,
     Ghahramani, Z., and Weinberger, K. Q., eds., 2751–2759, Curran Associates, Inc. (2013).
     """
@@ -287,9 +287,10 @@ class model_change(acquisition_function):
 
     Reference
     ---------
-    [4] Miller, K. and Bertozzi, A. L., “Model-change active learning in graph-based semi-supervised learning,”
+    [1] Miller, K. and Bertozzi, A. L., “Model-change active learning in graph-based semi-supervised learning,”
     (Oct. 2021). arXiv: 2110.07739.
-    [5] Karzand, M. and Nowak, R. D., “Maximin active learning in overparameterized model classes,” IEEE
+
+    [2] Karzand, M. and Nowak, R. D., “Maximin active learning in overparameterized model classes,” IEEE
     Journal on Selected Areas in Information Theory 1, 167–177 (May 2020).
     """
     def compute_acquisition_function_values(self, ssl, active_learning, oracle, uncertainty_method='smallest_margin'):
@@ -335,11 +336,13 @@ class model_change_vopt(acquisition_function):
 
     Reference
     ---------
-    [2] Ji, M. and Han, J., “A variance minimization criterion to active learning on graphs,” in [Artificial Intelligence
+    [1] Ji, M. and Han, J., “A variance minimization criterion to active learning on graphs,” in [Artificial Intelligence
     and Statistics ], 556–564 (Mar. 2012).
-    [4] Miller, K. and Bertozzi, A. L., “Model-change active learning in graph-based semi-supervised learning,”
+
+    [2] Miller, K. and Bertozzi, A. L., “Model-change active learning in graph-based semi-supervised learning,”
     (Oct. 2021). arXiv: 2110.07739.
-    [5] Karzand, M. and Nowak, R. D., “Maximin active learning in overparameterized model classes,” IEEE
+
+    [3] Karzand, M. and Nowak, R. D., “Maximin active learning in overparameterized model classes,” IEEE
     Journal on Selected Areas in Information Theory 1, 167–177 (May 2020).
     """
     def compute_acquisition_function_values(self, ssl, active_learning, oracle, uncertainty_method='smallest_margin'):
