@@ -17,4 +17,3 @@ ls -1 docs/ | sed 's/^/docs\//'
 #__pdoc__['class_name.method_name'] = False
 #
 #within the class definition.
-
