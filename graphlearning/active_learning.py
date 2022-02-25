@@ -9,7 +9,6 @@ individual functions, given in the documentation below.
 
 """
 import numpy as np
-import graphlearning as gl
 from scipy.special import softmax
 from abc import ABCMeta, abstractmethod
 import matplotlib.pyplot as plt
@@ -30,7 +29,7 @@ class active_learning:
         self.candidate_inds = np.setdiff1d(training_set, current_labeled_set)
         self.eval_cutoff = eval_cutoff
         self.gamma = gamma
-        evals, self.evecs = gl.graph(W).eigen_decomp(normalization='normalized', k=eval_cutoff)
+        evals, self.evecs = self.graph.eigen_decomp(normalization='normalized', k=eval_cutoff)
         self.covariance_matrix = np.linalg.inv(np.diag(evals) + self.evecs[current_labeled_set,:].T @ self.evecs[current_labeled_set,:] / gamma**2.)
 
     def reset_labeled_set(self):
