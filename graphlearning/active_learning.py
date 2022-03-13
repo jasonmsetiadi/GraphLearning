@@ -42,7 +42,7 @@ class active_learning:
         """Reset Labeled Data
         ======
 
-        Resets the current labeled set to the initial labeled set and current labels to initial labels
+        Resets the current labeled set, labels, and covariance matrix to the initial labeled set, labels, and covariance matrix.
 
         """
         self.current_labeled_set = self.initial_labeled_set
@@ -54,7 +54,7 @@ class active_learning:
         """Select query points
         ======
 
-        Select "batch_size" number of points to be labeled by an active learning algorithm we specify
+        Select "batch_size" number of points to be labeled by an active learning algorithm we specify.
 
         Parameters
         ----------
@@ -93,7 +93,7 @@ class active_learning:
         """Update labeled data
         ======
 
-        Update the current labeled set, current labels, and covariance matrix of our active learning object
+        Update the current labeled set, current labels, and covariance matrix of our active learning object.
 
         Parameters
         ----------
@@ -212,7 +212,7 @@ class v_opt(acquisition_function):
     """Variance Optimization
     ===================
 
-    Active learning algorithm that selects points that minimizes the variance of the distribution of unlabeled nodes
+    Active learning algorithm that selects points that minimizes the variance of the distribution of unlabeled nodes.
 
     Examples
     --------
@@ -270,7 +270,7 @@ class sigma_opt(acquisition_function):
     """Sigma Optimization
     ===================
 
-    Active learning algorithm that selects points that minimizes the sum of the associated entries in the covariance matrix
+    Active learning algorithm that selects points that minimizes the sum of the associated entries in the covariance matrix.
 
     Examples
     --------
@@ -329,7 +329,7 @@ class model_change(acquisition_function):
     """Model Change
     ===================
 
-    Active learning algorithm that selects points that will produce the greatest change in the model
+    Active learning algorithm that selects points that will produce the greatest change in the model.
 
     Examples
     --------
@@ -394,7 +394,7 @@ class model_change_vopt(acquisition_function):
     """Model Change Variance Optimization
     ===================
 
-    Active learning algorithm that is a combination of Model Change and Variance Optimization
+    Active learning algorithm that is a combination of Model Change and Variance Optimization.
 
     Examples
     --------
