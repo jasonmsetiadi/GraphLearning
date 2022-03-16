@@ -17,7 +17,7 @@ from . import graph
 
 
 class active_learning:
-    def __init__(self, W, current_labeled_set, current_labels, training_set=None, eval_cutoff=50, gamma=0.1):
+    def __init__(self, W, current_labeled_set, current_labels, training_set=None, eval_cutoff=50, gamma=0.1, normalization='normalized'):
         if type(W) == graph.graph:
             self.graph = W
         else:
@@ -34,7 +34,7 @@ class active_learning:
         self.eval_cutoff = eval_cutoff
         if self.eval_cutoff is not None:
             self.gamma = gamma
-            self.evals, self.evecs = self.graph.eigen_decomp(normalization='normalized', k=eval_cutoff)
+            self.evals, self.evecs = self.graph.eigen_decomp(normalization=normalization, k=eval_cutoff)
             self.cov_matrix = np.linalg.inv(np.diag(self.evals) + self.evecs[current_labeled_set,:].T @ self.evecs[current_labeled_set,:] / gamma**2.)
             self.init_cov_matrix = self.cov_matrix
 
